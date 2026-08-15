@@ -1,0 +1,11 @@
+<nav class="top-nav">
+  <div class="container d-flex align-items-center justify-content-between py-2 flex-wrap gap-2">
+    <a class="nav-brand" href="/"><span class="hero-emoji">📚</span> 资料搜索助手</a>
+    <div class="d-flex flex-wrap gap-2">
+      <a class="nav-item {{ 'active' if active == 'search' else '' }}" href="/"><i class="bi bi-search me-1"></i>全网搜索</a>
+      <a class="nav-item {{ 'active' if active == 'eval' else '' }}" href="/eval"><i class="bi bi-link-45deg me-1"></i>链接评估</a>
+      <a class="nav-item {{ 'active' if active == 'upload' else '' }}" href="/upload"><i class="bi bi-cloud-arrow-up me-1"></i>上传评估</a>
+      <a class="nav-item {{ 'active' if active == 'shelf' else '' }}" href="/shelf"><i class="bi bi-collection me-1"></i>我的资料</a>
+    </div>
+  </div>
+</nav>

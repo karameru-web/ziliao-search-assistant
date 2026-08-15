@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>链接评估 · 资料搜索助手</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="/static/icons/bootstrap-icons.css" rel="stylesheet">
+<link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+
+{% include "_nav.html" %}
+
+<div class="hero py-4 mb-4">
+  <div class="container text-center">
+    <h1 class="h3 mb-1"><span class="hero-emoji">🔗</span> 链接评估 <span class="hero-emoji">🔍</span></h1>
+    <p class="sub mb-0">粘贴小红书 / 知乎 / B站 等分享链接，看看内容的公开信息与风险提示</p>
+  </div>
+</div>
+
+<div class="container pb-5" style="max-width: 860px;">
+  <form id="eval-form" method="post" class="card eval-card p-4 mb-4">
+    <div class="mb-3">
+      <label class="form-label fw-semibold" for="link"><i class="bi bi-link-45deg me-1"></i>链接或整段分享文字</label>
+      <textarea class="form-control" id="link" name="link" rows="3"
+                placeholder="粘贴小红书/知乎/B站等分享链接，可整段粘贴，系统会自动识别">{{ link }}</textarea>
+      <div class="form-text text-muted">
+        直接粘贴整段文字也可以，系统会自动提取里面的 http/https 链接，例如：“这个资料太好了！ http://xhslink.com/xxxxx”
+      </div>
+    </div>
+    <div class="mb-3">
+      <label class="form-label fw-semibold" for="manual"><i class="bi bi-pencil-square me-1"></i>补充内容（可选）</label>
+      <textarea class="form-control" id="manual" name="manual" rows="7"
+                placeholder="如果自动抓取失败或不完整，请把你看到的帖子标题、正文、价格、卖家说的话复制粘贴进来。">{{ manual }}</textarea>
+      <div class="form-text text-muted">
+        如果自动抓取失败或不完整，请把你看到的帖子标题、正文、价格、卖家说的话复制粘贴进来。
+      </div>
+    </div>
+    <div class="d-grid">
+      <button class="btn btn-warning btn-lg fw-semibold" type="submit">
+        <i class="bi bi-stars me-1"></i>开始评估
+      </button>
+    </div>
+  </form>
+
+  {% if error %}
+  <div class="alert alert-danger">
+    <i class="bi bi-exclamation-triangle me-1"></i>{{ error }}
+  </div>
+  {% endif %}
+
+  {% if report %}
+  {% set f = report.fetch %}
+  <div class="alert {% if f.ok %}alert-success{% else %}alert-warning{% endif %}">
+    {% if f.ok %}
+    <i class="bi bi-check-circle me-1"></i>自动抓取成功：已提取标题 / 正文 / 图片说明。
+    {% else %}
+    <i class="bi bi-exclamation-triangle me-1"></i>自动抓取未成功：{{ f.reason }}。请在上方“补充内容”里手动粘贴帖子内容，再点一次“开始评估”。
+    {% endif %}
+  </div>
+  <p class="text-muted small">识别到的链接：<a href="{{ report.used_url }}" target="_blank" rel="noopener">{{ report.used_url }}</a></p>
+
+  <div class="card report-card p-4 mb-4">
+    <h5 class="report-title mb-3">📋 《资料评估报告》</h5>
+    <div class="verdict-box verdict-{{ report.level }} mb-3">
+      <i class="bi bi-shield-check me-1"></i>
+      <strong>总体判断：</strong>{{ report.verdict }}
+    </div>
+    <div class="mb-2">
+      <span class="fw-semibold">资料类型判断：</span>
+      <strong>{{ report.type_guess }}</strong>
+      <span class="badge source-badge text-bg-info ms-2">
+        {% if report.is_selling is none %}内容不足
+        {% elif report.is_selling %}疑似售卖内容
+        {% else %}暂未识别到售卖信息
+        {% endif %}
+      </span>
+    </div>
+    <div class="mb-2">
+      <span class="fw-semibold">风险提示：</span>
+      {% if report.lead_gen %}
+      <span class="risk-tag risk-red"><i class="bi bi-megaphone me-1"></i>引流话术：{{ report.lead_gen | join('、') }}</span>
+      {% endif %}
+      {% if report.exaggeration %}
+      <span class="risk-tag risk-orange"><i class="bi bi-fire me-1"></i>营销夸大：{{ report.exaggeration | join('、') }}</span>
+      {% endif %}
+      {% if not report.lead_gen and not report.exaggeration %}
+      <span class="text-muted">未发现明显风险话术</span>
+      {% endif %}
+    </div>
+    <div class="mb-2">
+      <span class="fw-semibold">免费替代提示：</span>
+      {% if report.free_hints %}
+      <span class="risk-tag risk-mint"><i class="bi bi-gift me-1"></i>提到「{{ report.free_hints | join('、') }}」，可能免费就能得到，先搜搜免费渠道</span>
+      {% else %}
+      <span class="text-muted">未发现免费相关词</span>
+      {% endif %}
+    </div>
+    <div class="evidence-box mt-3">
+      <div class="fw-semibold mb-1"><i class="bi bi-search me-1"></i>评估依据（系统识别到的关键词）</div>
+      <ul class="small mb-0">
+        {% if report.lead_gen %}
+        <li class="text-danger">引流类关键词：{{ report.lead_gen | join('、') }}</li>
+        {% else %}
+        <li>引流类关键词：未识别到</li>
+        {% endif %}
+        {% if report.exaggeration %}
+        <li class="text-danger">营销夸大关键词：{{ report.exaggeration | join('、') }}</li>
+        {% else %}
+        <li>营销夸大关键词：未识别到</li>
+        {% endif %}
+        {% if report.free_hints %}
+        <li class="text-success">免费相关词：{{ report.free_hints | join('、') }}</li>
+        {% else %}
+        <li>免费相关词：未识别到</li>
+        {% endif %}
+        <li>分析文本长度：{{ report.merged_text | length }} 字（自动抓取 + 用户补充）</li>
+      </ul>
+    </div>
+    <details class="mt-3">
+      <summary class="text-muted small">查看本次分析使用的合并内容</summary>
+      <pre class="eval-pre mt-2">{{ report.merged_text }}</pre>
+    </details>
+  </div>
+
+  <div class="alert alert-info small">
+    <i class="bi bi-info-circle me-1"></i>
+    本报告仅基于公开信息与关键词做提示，请自行核实；交易请尽量走平台担保，警惕私下转账。
+  </div>
+  {% else %}
+  <div class="alert alert-info small">
+    <i class="bi bi-info-circle me-1"></i>
+    本板块只做“链接评估”，不负责下载。粘贴链接后可自动抓取公开内容；如果链接打不开（部分平台限制访问），直接复制帖子文字到“补充内容”即可继续评估。
+  </div>
+  {% endif %}
+</div>
+
+<div class="cute-footer">🌸 链接评估仅供参考，请自行判断</div>
+
+<div id="fetch-tip-modal" class="fetch-tip-mask d-none">
+  <div class="fetch-tip-card">
+    <div class="fetch-tip-title">⚠️ 链接可能无法完整抓取</div>
+    <div class="fetch-tip-body">
+      <p>
+        该链接所在的平台对自动抓取限制比较严格，你贴的这条链接，有可能读不到完整的标题、正文、图片说明或卖家原话。这样评估结果会偏“不完整”，不是坏了，是平台限制。
+      </p>
+      <p>
+        为了评估更准，建议你：<br>
+        ① 回到原平台，把帖子标题、正文、价格、卖家原话，复制粘贴到下方补充框<br>
+        ② 补充后再点开始评估
+      </p>
+      <p>
+        如果暂时不方便复制，也可以关闭本提示。之后仍可手动填写内容进行评估。
+      </p>
+    </div>
+    <div class="fetch-tip-actions">
+      <button type="button" class="btn btn-soft" id="tip-fill">先去补充内容</button>
+      <button type="button" class="btn btn-warning" id="tip-continue">我知道了，继续</button>
+    </div>
+  </div>
+</div>
+
+<div id="eval-loading" class="eval-loading d-none">
+  <div class="card eval-card p-4 text-center">
+    <div class="spinner-border text-warning mb-2" role="status"></div>
+    <div class="fw-semibold">正在抓取并分析中…</div>
+    <div class="small text-muted">通常需要几秒钟，请稍候</div>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('#eval-form').forEach(function (form) {
+    form.addEventListener('submit', function () {
+      document.getElementById('eval-loading').classList.remove('d-none');
+    });
+  });
+
+  /* 粘贴含链接的内容时，弹出“链接可能无法完整抓取”提示 */
+  var linkInput = document.getElementById('link');
+  var tipModal = document.getElementById('fetch-tip-modal');
+  if (linkInput && tipModal) {
+    linkInput.addEventListener('paste', function (e) {
+      var text = ((e.clipboardData || window.clipboardData) || {}).getData ? (e.clipboardData || window.clipboardData).getData('text') : '';
+      if (/https?:\/\//i.test(text || '')) {
+        setTimeout(function () { tipModal.classList.remove('d-none'); }, 60);
+      }
+    });
+    document.getElementById('tip-continue').addEventListener('click', function () {
+      tipModal.classList.add('d-none');
+    });
+    document.getElementById('tip-fill').addEventListener('click', function () {
+      tipModal.classList.add('d-none');
+      var manual = document.getElementById('manual');
+      if (manual) {
+        manual.focus();
+        manual.scrollIntoView({behavior: 'smooth', block: 'center'});
+      }
+    });
+    tipModal.addEventListener('click', function (e) {
+      if (e.target === tipModal) tipModal.classList.add('d-none');
+    });
+  }
+</script>
+
+</body>
+</html>

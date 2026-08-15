@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>上传评估 · 资料搜索助手</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="/static/icons/bootstrap-icons.css" rel="stylesheet">
+<link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+
+{% include "_nav.html" %}
+
+<div class="hero py-4 mb-4">
+  <div class="container text-center">
+    <h1 class="h3 mb-1"><span class="hero-emoji">📤</span> 上传评估 <span class="hero-emoji">🧾</span></h1>
+    <p class="sub mb-0">先上传到列表，再勾选 2 份以上开始查重对比</p>
+  </div>
+</div>
+
+<div class="container pb-5" style="max-width: 920px;">
+  <form id="upload-form" method="post" enctype="multipart/form-data" action="/upload" class="card eval-card p-4 mb-4">
+    <div class="mb-3">
+      <label class="form-label fw-semibold" for="files"><i class="bi bi-file-earmark-arrow-up me-1"></i>上传文件（可多选，可多次添加）</label>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <input class="form-control" type="file" id="files" name="files" multiple accept=".pdf,.txt,.docx" style="max-width: 520px;">
+        <button class="btn btn-warning fw-semibold" type="submit"><i class="bi bi-upload me-1"></i>添加文件到列表</button>
+      </div>
+      <div class="form-text text-muted">
+        支持 PDF、TXT、DOCX；.pages / .doc 请先导出为 PDF 或 Word 再上传；扫描版 PDF 无法读取时会提示并跳过。
+      </div>
+    </div>
+  </form>
+
+  {% if message %}
+  <div class="alert {% if message_type == 'success' %}alert-success{% else %}alert-warning{% endif %}">
+    <i class="bi {% if message_type == 'success' %}bi-check-circle{% else %}bi-exclamation-triangle{% endif %} me-1"></i>{{ message }}
+  </div>
+  {% endif %}
+
+  <div class="card eval-card p-4 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+      <h5 class="font-title mb-0">🗂️ 文件列表（含历史上传）</h5>
+      <div class="d-flex gap-2 align-items-center">
+        <span id="file-count" class="small text-muted">已选 0 份</span>
+        <button id="evaluate-btn" class="btn btn-download fw-semibold">
+          <i class="bi bi-stars me-1"></i>开始评估
+        </button>
+      </div>
+    </div>
+    <p class="text-muted small mb-2">提示：勾选至少 2 份文件后点“开始评估”；评估会同时对比这些文件与资料库中已有资料的重合度。</p>
+
+    <div class="file-list mb-3">
+      {% if uploads %}
+      {% for item in uploads %}
+      <div class="file-row">
+        <input type="checkbox" class="form-check-input file-check" value="{{ item.id }}" data-id="{{ item.id }}" aria-label="选择 {{ item.title }}">
+        <div class="flex-grow-1 min-width-0">
+          <button type="button" class="file-name-link btn-open-file" data-rel="{{ item.rel }}" title="用系统默认程序打开">{{ item.title }}</button>
+          <div class="small text-muted">
+            {{ item.size_human or '—' }}
+            {% if item.pages %} · {{ item.pages }} 页{% endif %}
+            {% if item.chars %} · {{ item.chars }} 字{% endif %}
+            · {{ item.added_at }}
+          </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-soft btn-open-file" data-rel="{{ item.rel }}"><i class="bi bi-display me-1"></i>打开</button>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="text-muted small py-3 text-center">还没有文件，请先在上方添加。</div>
+      {% endif %}
+    </div>
+
+    <div id="eval-progress" class="d-none">
+      <div class="progress small-progress" role="progressbar" aria-label="评估进度">
+        <div id="eval-progress-bar" class="progress-bar" style="width: 0%"></div>
+      </div>
+      <p id="eval-progress-text" class="small text-muted mt-2 mb-0">正在评估第 0 / 0 份文件…</p>
+    </div>
+  </div>
+
+  {% if analysis %}
+  <div class="card report-card p-4 mb-4">
+    <h5 class="report-title mb-3">📋 《批量查重报告》</h5>
+
+    <h6 class="font-title mb-2">① 勾选文件的读取情况</h6>
+    {% if analysis.files %}
+    <table class="table table-sm align-middle upload-table mb-3">
+      <thead><tr><th>文件名</th><th>状态</th><th>页数</th><th>字数</th></tr></thead>
+      <tbody>
+        {% for f in analysis.files %}
+        <tr>
+          <td>{{ f.name }}</td>
+          <td>{% if f.readable %}<span class="badge source-badge text-bg-success">可读</span>{% else %}<span class="badge source-badge text-bg-warning">{{ f.note }}</span>{% endif %}</td>
+          <td>{% if f.readable %}{{ f.pages }} 页{% else %}—{% endif %}</td>
+          <td>{% if f.readable %}{{ f.chars }} 字{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted small">没有可读取的文件。</p>
+    {% endif %}
+
+    <h6 class="font-title mb-2">② 重复度与完整度对比（重合度 ≥ 50% 才展示）</h6>
+    {% if analysis.pairs %}
+    <div class="d-flex flex-column gap-2 mb-3">
+      {% for p in analysis.pairs %}
+      <div class="pair-item">
+        <div class="fw-semibold">《{{ p.a }}》与《{{ p.b }}》重合度约 {{ p.sim }}%</div>
+        {% if p.highly %}
+        <div class="small text-danger"><i class="bi bi-exclamation-circle me-1"></i>{{ p.recommend }}</div>
+        {% endif %}
+        <div class="small text-muted">相同点：{{ p.a }} 与 {{ p.b }} 相似度 {{ p.sim }}%；不同点：{{ p.a }} 比 {{ p.b }} {{ '多' if p.diff_chars > 0 else '少' }} {{ p.diff_chars | abs }} 字{% if p.diff_pages != 0 %}，页数相差 {{ p.diff_pages | abs }} 页{% endif %}</div>
+        <div class="small text-muted">评估依据：{{ p.a }} 页数：{{ p.a_pages }} 页 ｜ {{ p.b }} 页数：{{ p.b_pages }} 页 ｜ {{ p.a }} 字数：{{ p.a_chars }} ｜ {{ p.b }} 字数：{{ p.b_chars }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted small mb-3">未发现高度重复的文件（勾选文件之间没有重合度 ≥ 50% 的组合）。</p>
+    {% endif %}
+
+    {% if analysis.skipped %}
+    <h6 class="font-title mb-2">③ 已跳过的文件</h6>
+    <ul class="small text-muted mb-0">
+      {% for s in analysis.skipped %}
+      <li>《{{ s.name }}》：{{ s.reason }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="cute-footer">🌸 上传评估只做查重与完整度对比，不做引流/营销分析 · 文件保存在 {{ bookshelf_path or 'bookshelf/' }}</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/main.js"></script>
+</body>
+</html>

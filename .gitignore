@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+build/
+dist/
+*.spec
+bookshelf/
+progress.db
+icon.png
+.DS_Store
+.tools/
