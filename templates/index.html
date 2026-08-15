@@ -39,6 +39,12 @@
   {% endif %}
 
   {% if result %}
+  {% if result.stats.timed_out %}
+  <div class="alert alert-warning small">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    部分来源访问超时（可能是对方网站反爬或网络较慢），本次先展示已抓取到的 {{ result.stats.total_raw }} 条结果；可以稍后重试获得更完整结果。
+  </div>
+  {% endif %}
   <div class="row g-3 mb-4">
     <div class="col-6 col-lg-3">
       <div class="card stat-card shadow-sm"><div class="card-body text-center">

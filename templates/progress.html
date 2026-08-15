@@ -51,6 +51,11 @@
       <strong>搜索超时，请重试。</strong>可能是网络较慢或对方网站限制了访问。
       <a class="btn btn-sm btn-danger ms-2" href="/">重新搜索</a>
     </div>
+    <div id="partial-box" class="d-none alert alert-warning mt-3 mb-0">
+      <strong>部分来源访问超时。</strong>
+      <span id="partial-text">已抓到 0 条内容，可先查看已抓取的部分结果。</span>
+      <a id="partial-link" class="btn btn-sm btn-warning ms-2" href="#">查看已抓取的部分结果</a>
+    </div>
     <div id="error-box" class="d-none alert alert-warning mt-3 mb-0">
       <strong>搜索出错，请重试。</strong><span id="error-text"></span>
       <a class="btn btn-sm btn-warning ms-2" href="/">重新搜索</a>
@@ -68,6 +73,9 @@ const bar = document.getElementById('progress-bar');
 const countText = document.getElementById('count-text');
 const noteText = document.getElementById('note-text');
 const timeoutBox = document.getElementById('timeout-box');
+const partialBox = document.getElementById('partial-box');
+const partialText = document.getElementById('partial-text');
+const partialLink = document.getElementById('partial-link');
 const errorBox = document.getElementById('error-box');
 const errorText = document.getElementById('error-text');
 let polling = true;
@@ -91,13 +99,6 @@ async function poll() {
     }
     bar.style.width = widthOf(s.count) + '%';
     countText.textContent = '已抓到 ' + s.count + ' 条内容';
-    if (s.timed_out) {
-      polling = false;
-      timeoutBox.classList.remove('d-none');
-      noteText.classList.add('d-none');
-      bar.classList.remove('progress-bar-animated');
-      return;
-    }
     if (s.status === 'error') {
       polling = false;
       errorText.textContent = s.error || '';
@@ -108,6 +109,21 @@ async function poll() {
     if (s.done) {
       polling = false;
       window.location.href = '/result/' + SEARCH_ID;
+      return;
+    }
+    if (s.timed_out) {
+      if (s.count > 0) {
+        // 已抓到部分内容：提示可先看，同时继续等待后台把剩余部分整理完
+        partialText.textContent = '已抓到 ' + s.count + ' 条内容，可先查看已抓取的部分结果。';
+        partialLink.href = '/result/' + SEARCH_ID;
+        partialBox.classList.remove('d-none');
+        noteText.classList.add('d-none');
+      } else {
+        polling = false;
+        timeoutBox.classList.remove('d-none');
+        noteText.classList.add('d-none');
+        bar.classList.remove('progress-bar-animated');
+      }
     }
   } catch (e) {
     // 网络小抖动，等下一轮轮询再试

@@ -80,7 +80,13 @@ def _article_url(item):
 
 
 def fetch_bilibili(
-    keyword, pages=3, article_limit=30, delay=2.0, progress_cb=None, title_filter=None
+    keyword,
+    pages=3,
+    article_limit=30,
+    delay=2.0,
+    progress_cb=None,
+    title_filter=None,
+    deadline=None,
 ):
     """抓取 B站 视频 + 专栏，返回 (视频列表, 专栏列表, 警告列表)。
 
@@ -92,6 +98,8 @@ def fetch_bilibili(
     session = _new_bili_session()
 
     for page in range(1, pages + 1):
+        if deadline and time.time() > deadline:
+            break
         v0 = len(videos)
         data = _search_all_v2(session, keyword, page)
         code = data.get("code")
@@ -149,6 +157,8 @@ def fetch_bilibili(
     # 专栏：显式按类型抓前 3 页
     seen_article_urls = set()
     for page in range(1, pages + 1):
+        if deadline and time.time() > deadline:
+            break
         a0 = len(articles)
         d2 = _search_type(session, keyword, page, "article")
         if d2.get("code") == -412:
@@ -251,10 +261,13 @@ def fetch_bing(
     delay=2.0,
     progress_cb=None,
     title_filter=None,
+    deadline=None,
 ):
     """抓取 Bing 网页（可选 site 限定），返回 (结果列表, 警告列表)。"""
     results, warnings = [], []
     for first in range(1, pages * per_page, per_page):
+        if deadline and time.time() > deadline:
+            break
         before = len(results)
         query = keyword if not site else f"{keyword} site:{site}"
         items, blocked = _fetch_bing_page(query, first, site)
@@ -275,7 +288,13 @@ def fetch_bing(
 
 
 def fetch_zhihu(
-    keyword, pages=3, target=20, delay=2.0, progress_cb=None, title_filter=None
+    keyword,
+    pages=3,
+    target=20,
+    delay=2.0,
+    progress_cb=None,
+    title_filter=None,
+    deadline=None,
 ):
     """通过 Bing 抓知乎：Bing 的 site: 限定每页只混入少量知乎链接，
     所以组合三种查询写法，并按网址去重，尽量凑到 20 条。"""
@@ -288,9 +307,13 @@ def fetch_zhihu(
         f"{keyword.replace(' ', '')} 知乎",
     ]
     for variant in variants:
+        if deadline and time.time() > deadline:
+            break
         if len(results) >= target:
             break
         for first in range(1, pages * 10, 10):
+            if deadline and time.time() > deadline:
+                break
             if len(results) >= target:
                 break
             before = len(results)
